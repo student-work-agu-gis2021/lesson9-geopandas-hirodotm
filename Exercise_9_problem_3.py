@@ -9,13 +9,18 @@
 # YOUR CODE HERE 1 to read data
 import geopandas as gpd
 from pyproj import CRS
-data=None
+import os
+
+#read the shapely file
+input_fp = os.path.join("Kruger_posts.shp")
+data=gpd.read_file(input_fp)
 
 # - Check the crs of the input data. If this information is missing, set it as epsg:4326 (WGS84).
 # - Reproject the data from WGS84 to `EPSG:32735` -projection which stands for UTM Zone 35S (UTM zone for South Africa) to transform the data into metric system. (don't create a new variable, update the existing variable `data`!)"
 
 # YOUR CODE HERE 2 to set crs
-
+#set crs
+data=data.to_crs(epsg=32735)
 # CODE FOR TESTING YOUR SOLUTION
 
 # Check the data
@@ -30,7 +35,8 @@ print(data.crs)
 #  - Group the data by userid
 
 #  YOUR CODE HERE 3 to group 
-grouped=None
+#grouping
+grouped=data.groupby('userid')
 
 # CODE FOR TESTING YOUR SOLUTION
 
@@ -44,7 +50,36 @@ assert len(grouped.groups) == data["userid"].nunique(), "Number of groups should
 # YOUR CODE HERE 4 to set movements
 import pandas as pd
 from shapely.geometry import LineString, Point
-movements=None
+#set movements
+movements=pd.DataFrame()
+movements['geometry']=None
+data=data.sort_values(['userid','timestamp'])
+geometry=[]
+t=data['userid'].min(axis=0)
+p=[]
+u=[]
+u.append(t)
+for idx,row in data.iterrows():
+  p.append(row['geometry'])
+  if t!=row['userid']:
+    if len(p)>1:
+      geometry.append(LineString(p))
+    if len(p)<=1:
+      geometry.append(Point(p[0]))
+    t=row['userid']
+    u.append(t)
+    p=[]
+datat=data[data['userid']==t]
+for idx,row in datat.iterrows():
+  p.append(row['geometry'])
+if len(p)>1:
+  geometry.append(LineString(p))
+if len(p)<=1:
+  geometry.append(Point(p[0]))
+movements['userid']=u
+movements['geometry']=geometry
+movements = gpd.GeoDataFrame(movements,geometry='geometry',crs=CRS.from_epsg(32735).to_wkt())
+
 # CODE FOR TESTING YOUR SOLUTION
 
 #Check the result
@@ -58,11 +93,20 @@ print(movements["geometry"].head())
 # - Calculate the lenghts of the lines into a new column called ``distance`` in ``movements`` GeoDataFrame.
 
 # YOUR CODE HERE 5 to calculate distance
+#calculate distance
+movements['distance']=None
+dist=[]
+for idx,row in movements.iterrows():
+  if type(row['geometry'])==LineString:
+    dist.append(row['geometry'].length)
+  if type(row['geometry'])==Point:
+    dist.append(0)
+movements['distance']=dist
 
 # CODE FOR TESTING YOUR SOLUTION
 
 #Check the output
-movements.head()
+print(movements.head())
 
 
 # You should now be able to print answers to the following questions: 
@@ -72,14 +116,22 @@ movements.head()
 #  - What was the maximum distance travelled in meters?
 
 # YOUR CODE HERE 6 to find max, min,mean of the distance.
+#sarch some dustance
+datat=movements[movements['distance']>0]
+min=datat['distance'].min(axis=0)
+max=datat['distance'].max(axis=0)
+mean=datat['distance'].mean(axis=0)
+
 
 # - Finally, save the movements of into a Shapefile called ``some_movements.shp``
 
 # YOUR CODE HERE 7 to save as Shapefile
-
+fp = 'some_movements.shp'
+outpath = os.path.join(fp)
+movements.to_file(outpath)
 # CODE FOR TESTING YOUR SOLUTION
 
-import os
+
 
 #Check if output file exists
 assert os.path.isfile(fp), "Output file does not exits."
